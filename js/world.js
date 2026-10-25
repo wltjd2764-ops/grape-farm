@@ -71,7 +71,7 @@ const World = (() => {
   const cam = { x: 0, y: 200, snap: true };
   const player = { gx: 12, gy: 6.9, dir: 'down', frame: 0, ft: 0, moving: false, target: null, onArrive: null, stuck: 0 };
   const keys = new Set();
-  let particles = [], floats = [], near = null, hovered = null, marker = null, smokeT = 0;
+  let particles = [], floats = [], near = null, hovered = null, marker = null, smokeT = 0, pondArmed = true;
   const butterflies = Array.from({ length: 6 }, (_, i) => ({ gx: 3 + i * 3.4, gy: 8 + (i % 3) * 5, a: i * 1.3, col: ['#ffffff', '#f9e27a', '#f7a1c4', '#b9e0ff', '#ffffff', '#f9e27a'][i] }));
   const fireflies = Array.from({ length: 30 }, () => ({ gx: 1 + Math.random() * 22, gy: 8 + Math.random() * 15, p: Math.random() * 10 }));
   const clouds = Array.from({ length: 3 }, (_, i) => ({ x: -500 + i * 380, y: 60 + i * 120, s: 0.9 + i * 0.25 }));
@@ -234,6 +234,12 @@ const World = (() => {
     near = null;
     let best = 1e9;
     for (const it of INTER) { const d = interDist(it, player.gx, player.gy); if (d < it.range && d < best) { best = d; near = it; } }
+    // 이스터에그: 연못가에 다가가면 (표시 없음)
+    if (!inPond(player.gx, player.gy, 1.4)) pondArmed = true;
+    if (pondArmed && !blocking && inPond(player.gx, player.gy, 0.85) && hooks.onPond) {
+      pondArmed = false; player.target = null; player.onArrive = null;
+      hooks.onPond();
+    }
 
     const [px, py] = iso(player.gx, player.gy);
     const vw = canvas.width / zoom, vh = canvas.height / zoom;
@@ -296,6 +302,13 @@ const World = (() => {
       if (Math.sin(t * 2 + k * 1.7) < 0) continue;
       const [x, y] = iso(POND.cx + Math.sin(t * 0.5 + k * 2.1) * 1.4, POND.cy - 0.8 + (k * 0.27) % 1.6);
       R(ctx, Math.round(x), Math.round(y), 4, 1, '#bfe6fa');
+    }
+    // 가끔 올라오는 물방울 (연못의 비밀 힌트)
+    for (let k = 0; k < 3; k++) {
+      const ph = (t * 0.35 + k * 0.33) % 1;
+      if (ph > 0.35) continue;
+      const [x, y] = iso(POND.cx - 1 + k * 0.9, POND.cy - 0.3 + (k % 2) * 0.6, ph * 26);
+      R(ctx, Math.round(x), Math.round(y), 2, 2, '#e6f8ff'); R(ctx, Math.round(x) + 3, Math.round(y) + 4, 1, 1, '#e6f8ff');
     }
     // 하이라이트 · 클릭 표시
     const hl = hovered || near;
@@ -444,7 +457,7 @@ const World = (() => {
 
   function frame(now) {
     if (!running) return;
-    const dt = Math.min(0.05, (now - last) / 1000 || 0);
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000 || 0));
     last = now;
     if (state) {
       if (state.plotsUnlocked !== bgUnlocked) { bgUnlocked = state.plotsUnlocked; renderBG(); }

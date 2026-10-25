@@ -8,7 +8,7 @@ const FX = (() => {
   const ease = k => k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2;
 
   function loop(now) {
-    const dt = Math.min(0.05, (now - last) / 1000);
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
     last = now;
     c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.clearRect(0, 0, innerWidth, innerHeight);

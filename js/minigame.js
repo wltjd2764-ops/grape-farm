@@ -149,7 +149,7 @@ const Minigame = (() => {
       const hk = Math.max(0, hearts); if ($hearts.dataset.n !== String(hk)) { $hearts.dataset.n = hk; $hearts.innerHTML = Pix.img('heart').repeat(hk) + Pix.img('heartE').repeat(3 - hk); }
     }
     function loop(now) {
-      const dt = Math.min(0.05, (now - last) / 1000 || 0);
+      const dt = Math.max(0, Math.min(0.05, (now - last) / 1000 || 0));
       last = now;
       update(dt); draw();
       raf = requestAnimationFrame(loop);

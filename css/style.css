@@ -392,3 +392,12 @@ kbd { display: inline-grid; place-items: center; width: 38px; height: 38px; back
 .gd-dots i { width: 10px; height: 10px; background: var(--cream-lo); cursor: pointer; box-shadow: 0 0 0 2px var(--ol); }
 .gd-dots i.on { background: var(--grape); }
 @media (max-width: 640px) { .guide-btn { top: 10px; right: 10px; font-size: 12px; padding: 5px 10px; } }
+
+/* 비밀의 연못 */
+.pond-ask { text-align: center; }
+.pond-ask p { line-height: 1.8; }
+.pond-ask .pi.xl { animation: bob .8s steps(2) infinite; }
+.pond-stage { aspect-ratio: 3 / 2; width: min(480px, 100%); }
+.pond-hud { width: min(480px, 100%); }
+.pond-modal { width: min(560px, 100%); }
+.pd-hearts .pi { width: 21px; height: 21px; }

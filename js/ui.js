@@ -54,7 +54,7 @@ const UI = (() => {
     if (from === target) { el.textContent = target; return; }
     const t0 = performance.now(), dur = Math.min(1200, 300 + Math.abs(target - from) * 5);
     const step = now => {
-      const k = Math.min(1, (now - t0) / dur);
+      const k = Math.max(0, Math.min(1, (now - t0) / dur));
       shownCoins = Math.round(from + (target - from) * (1 - (1 - k) ** 3));
       el.textContent = shownCoins;
       if (k < 1) coinRaf = requestAnimationFrame(step);
@@ -571,6 +571,39 @@ const UI = (() => {
     });
   }
 
+  // ───── 이스터에그: 비밀의 연못 ─────
+  function openPondPrompt() {
+    Sfx.pop();
+    const m = modal({
+      title: '…?', icon: 'drop', cls: 'pond-prompt',
+      body: `<div class="pond-ask">${ic('spark', 'xl')}
+        <p>연못 속에서 무언가 <b>반짝</b>이고 있어요…<br>뛰어들어 보시겠어요?</p>
+        <div class="row"><button class="btn grape big" data-act="go">${ic('drop')}입장하기</button><button class="btn ghost" data-act="no">그만두기</button></div></div>`,
+    });
+    $('[data-act=no]', m.body).onclick = () => m.close();
+    $('[data-act=go]', m.body).onclick = () => {
+      m.close();
+      Sfx.splash();
+      if (!state.pondFound) {
+        state.pondFound = true;
+        state.coins += 50;
+        persist();
+        setTimeout(() => { Sfx.fanfare(); toast('{spark} 숨겨진 연못을 발견했어요! 보너스 {coin}50', 3600); }, 400);
+      }
+      Pond.open({
+        look: () => state.look,
+        best: () => state.pondBest || 0,
+        finish: score => {
+          const reward = Math.floor(score / 5), newBest = score > (state.pondBest || 0);
+          if (newBest) state.pondBest = score;
+          state.coins += reward;
+          persist();
+          return { reward, best: state.pondBest, newBest };
+        },
+      });
+    };
+  }
+
   // ───── 설정 ─────
   function openSettings() {
     const m = modal({ title: '설정', icon: 'gear', cls: 'settings-modal' });
@@ -633,6 +666,7 @@ const UI = (() => {
       else if (i < state.plotsUnlocked) openPlant(i);
       else openExpand(i);
     },
+    onPond() { openPondPrompt(); },
     onBuilding(id) {
       Sfx.click();
       ({ chateau: openJournal, boutique: openWardrobe, cave: openMinigame })[id]();
