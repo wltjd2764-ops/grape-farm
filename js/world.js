@@ -40,7 +40,7 @@ const World = (() => {
     { gx: 0.9, gy: 11.5, r: 0.45, sprite: sp(Sprites.tree, false) }, { gx: 23.1, gy: 11.5, r: 0.45, sprite: sp(Sprites.tree, true) },
     { gx: 0.9, gy: 16.5, r: 0.45, sprite: sp(Sprites.tree, true) }, { gx: 23.1, gy: 16.8, r: 0.45, sprite: sp(Sprites.tree, false) },
     { gx: 14.0, gy: 22.6, r: 0.45, sprite: sp(Sprites.tree, true) }, { gx: 7.0, gy: 7.1, r: 0, sprite: sp(Sprites.flowers) },
-    { gx: 6.3, gy: 21.2, r: 0.25, sprite: sp(Sprites.rock) }, { gx: 18.0, gy: 20.8, r: 0.25, sprite: sp(Sprites.rock) },
+    { gx: 6.6, gy: 23.3, r: 0, sprite: sp(Sprites.rock) }, { gx: 18.0, gy: 20.8, r: 0, sprite: sp(Sprites.rock) },
     { gx: 0.8, gy: 7.6, r: 0.4, sprite: sp(Sprites.bush) }, { gx: 23.2, gy: 7.8, r: 0.4, sprite: sp(Sprites.bush) },
   ];
 
@@ -179,8 +179,24 @@ const World = (() => {
   function onPointerDown(e) {
     if (UI.isBlocking()) return;
     const [wx, wy] = toWorld(e.clientX, e.clientY), hit = hitTest(wx, wy);
+    const g = toGrid(wx, wy);
+    if (inPond(g[0], g[1], 0.35)) {
+      // 연못을 누르면 플레이어 쪽 연못가로 걸어가서 입장 창
+      const a = Math.atan2((player.gy - POND.cy) / POND.ry, (player.gx - POND.cx) / POND.rx);
+      const edge = [POND.cx + Math.cos(a) * (POND.rx + 0.5), POND.cy + Math.sin(a) * (POND.ry + 0.5)];
+      if (inPond(player.gx, player.gy, POND_RING)) triggerPond(true); else walkTo(edge, () => triggerPond(true));
+      return;
+    }
     if (hit) { if (interDist(hit, player.gx, player.gy) < hit.range + 0.3) act(hit); else walkTo(hit.approach, () => act(hit)); }
-    else { const g = toGrid(wx, wy); walkTo(g, null); marker = { g, t: 0 }; }
+    else { walkTo(g, null); marker = { g, t: 0 }; }
+  }
+  // 이스터에그: 연못 입장 창 (표시 없음)
+  const POND_RING = 0.95;
+  function triggerPond(force) {
+    if ((!force && !pondArmed) || !hooks.onPond || UI.isBlocking()) return;
+    pondArmed = false;
+    player.target = null; player.onArrive = null;
+    hooks.onPond();
   }
   function onPointerMove(e) {
     const [wx, wy] = toWorld(e.clientX, e.clientY);
@@ -221,6 +237,7 @@ const World = (() => {
       const sp = 3.4 * dt, ox = player.gx, oy = player.gy;
       if (!blocked(player.gx + mx * sp, player.gy)) player.gx += mx * sp;
       if (!blocked(player.gx, player.gy + my * sp)) player.gy += my * sp;
+      if (inPond(player.gx + mx * 0.3, player.gy + my * 0.3, 0.15)) triggerPond(false);
       const scx = mx - my, scy = (mx + my) / 2;
       player.dir = Math.abs(scx) > Math.abs(scy) * 1.6 ? (scx > 0 ? 'right' : 'left') : (scy > 0 ? 'down' : 'up');
       player.ft += dt;
@@ -234,12 +251,9 @@ const World = (() => {
     near = null;
     let best = 1e9;
     for (const it of INTER) { const d = interDist(it, player.gx, player.gy); if (d < it.range && d < best) { best = d; near = it; } }
-    // 이스터에그: 연못가에 다가가면 (표시 없음)
-    if (!inPond(player.gx, player.gy, 1.4)) pondArmed = true;
-    if (pondArmed && !blocking && inPond(player.gx, player.gy, 0.85) && hooks.onPond) {
-      pondArmed = false; player.target = null; player.onArrive = null;
-      hooks.onPond();
-    }
+    // 연못 테두리에 닿으면 입장 창. 한 번 뜬 뒤에는 연못에서 멀어졌다 와야 다시 뜸
+    if (!inPond(player.gx, player.gy, POND_RING + 0.6)) pondArmed = true;
+    if (inPond(player.gx, player.gy, POND_RING)) triggerPond(false);
 
     const [px, py] = iso(player.gx, player.gy);
     const vw = canvas.width / zoom, vh = canvas.height / zoom;
@@ -504,5 +518,13 @@ const World = (() => {
   function floatText(i, text, icon) { const p = PLOTS[i]; if (!p) return; const [x, y] = iso(p.gx + 2, p.gy + 1.5, 30); floats.push({ x, y, text, icon, t: 0 }); }
   function walkToPlot(i) { const it = INTER.find(x => x.kind === 'plot' && x.i === i); if (it) walkTo(it.approach, () => act(it)); }
 
-  return { init, start, setState, setTimeMode, burst, floatText, walkToPlot, todMode, PLOTS };
+  // 격자 좌표 → 화면(CSS px) 좌표
+  function screenOf(gx, gy) {
+    const [x, y] = iso(gx, gy);
+    return [(x * zoom - Math.round(cam.x * zoom - canvas.width / 2)) / dpr, (y * zoom - Math.round(cam.y * zoom - canvas.height / 2)) / dpr];
+  }
+
+  const playerPos = () => [player.gx, player.gy];
+
+  return { init, start, setState, setTimeMode, burst, floatText, walkToPlot, todMode, screenOf, playerPos, PLOTS, POND };
 })();
