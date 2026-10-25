@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>포도알 농장</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/galmuri.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ───── 로그인 ───── -->
+<section id="login-screen" class="screen">
+  <canvas id="scene" width="320" height="180"></canvas>
+  <button id="guide-btn" class="btn gold guide-btn"><i data-ic="book"></i>농장 운영 안내서</button>
+  <div class="login-card px-panel">
+    <div class="logo">
+      <img id="logo-bunch" alt="">
+      <h1>포도알 농장</h1>
+      <p class="logo-sub">CHÂTEAU RAISIN · 습관이 열매가 되는 곳</p>
+    </div>
+    <div class="seg login-tabs"><button class="on" data-tab="login">로그인</button><button data-tab="signup">회원가입</button></div>
+    <form id="login-form" autocomplete="on">
+      <label class="field"><span>아이디</span><input name="id_" autocomplete="username" placeholder="아이디"></label>
+      <label class="field"><span>비밀번호</span><input name="pw" type="password" autocomplete="current-password" placeholder="비밀번호"></label>
+      <p class="err" hidden></p>
+      <button class="btn grape big wide" type="submit"><i data-ic="grape"></i>농장 입장</button>
+    </form>
+    <form id="signup-form" hidden>
+      <div class="field"><span>캐릭터</span>
+        <div class="gender-pick">
+          <button type="button" class="gp on" data-g="f"><canvas width="20" height="30"></canvas><b>여자 일꾼</b></button>
+          <button type="button" class="gp" data-g="m"><canvas width="20" height="30"></canvas><b>남자 일꾼</b></button>
+        </div>
+      </div>
+      <label class="field"><span>아이디</span><input name="id_" autocomplete="username" placeholder="영문/숫자 3~16자"></label>
+      <label class="field"><span>닉네임</span><input name="nick" maxlength="10" placeholder="농장에서 불릴 이름"></label>
+      <label class="field"><span>비밀번호</span><input name="pw" type="password" autocomplete="new-password" placeholder="6자 이상"></label>
+      <label class="field"><span>비밀번호 확인</span><input name="pw2" type="password" autocomplete="new-password"></label>
+      <p class="err" hidden></p>
+      <button class="btn big wide" type="submit"><i data-ic="sprout"></i>농장 만들기</button>
+    </form>
+    <div class="divider"><span>또는</span></div>
+    <button id="demo-btn" class="btn ghost wide"><i data-ic="basket"></i>체험 계정으로 둘러보기</button>
+    <p class="login-note" id="login-note">계정과 기록은 이 브라우저에 저장돼요</p>
+  </div>
+</section>
+
+<!-- ───── 게임 ───── -->
+<section id="game-screen" class="screen" hidden>
+  <canvas id="world"></canvas>
+  <div id="hud">
+    <div class="hud-profile px-panel">
+      <canvas id="hud-avatar" width="20" height="17"></canvas>
+      <div>
+        <div id="hud-name"></div>
+        <div class="lv"><span id="hud-lv">Lv.1</span><div class="pxbar xp"><i id="hud-xp"></i></div></div>
+        <div id="hud-sync"></div>
+      </div>
+    </div>
+    <div class="hud-res">
+      <div class="res-pill" title="코인"><i data-ic="coin"></i><b id="hud-coins">0</b></div>
+      <div class="res-pill" title="모은 포도알"><i data-ic="grape"></i><b id="hud-grapes">0</b></div>
+      <div class="res-pill" title="수확한 송이"><i data-ic="basket"></i><b id="hud-bunches">0</b></div>
+      <button class="icon-btn" id="btn-settings" aria-label="설정"><i data-ic="gear"></i></button>
+    </div>
+  </div>
+  <nav id="dock">
+    <button data-act="today"><i data-ic="grape"></i><em>오늘의 포도</em><b class="dot" hidden></b></button>
+    <button data-act="journal"><i data-ic="book"></i><em>기록장</em></button>
+    <button data-act="wardrobe"><i data-ic="hat"></i><em>옷장</em></button>
+    <button data-act="minigame"><i data-ic="game"></i><em>미니게임</em></button>
+  </nav>
+</section>
+
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+<canvas id="fx"></canvas>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/data.js"></script>
+<script src="js/pix.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/fx.js"></script>
+<script src="js/world.js"></script>
+<script src="js/minigame.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/scene.js"></script>
+<script src="js/guide.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
