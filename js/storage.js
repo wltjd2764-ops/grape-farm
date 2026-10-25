@@ -136,6 +136,25 @@ const Store = (() => {
     session = { id, mode: 'local' };
     return { ok: true };
   }
+  async function changePassword(oldPw, newPw) {
+    if (!session) return { ok: false, msg: '로그인 상태가 아니에요.' };
+    if (session.id === 'demo') return { ok: false, msg: '체험 계정은 비밀번호를 바꿀 수 없어요.' };
+    if (session.mode === 'cloud') {
+      try {
+        await cloudUser.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(cloudUser.email, oldPw));
+        await cloudUser.updatePassword(newPw);
+        return { ok: true };
+      } catch (e) {
+        const wrong = ['auth/wrong-password', 'auth/invalid-credential', 'auth/invalid-login-credentials'].includes(e.code);
+        return { ok: false, msg: wrong ? '현재 비밀번호가 맞지 않아요.' : errMsg(e) };
+      }
+    }
+    const users = read(USERS, {}), u = users[session.id];
+    if (!u || await hash(oldPw, u.salt) !== u.hash) return { ok: false, msg: '현재 비밀번호가 맞지 않아요.' };
+    u.salt = uid() + uid();
+    u.hash = await hash(newPw, u.salt);
+    return write(USERS, users) ? { ok: true } : { ok: false, msg: '브라우저 저장소에 접근할 수 없어요.' };
+  }
   async function logout() {
     await flush();
     try { localStorage.removeItem(SESSION); } catch { /* 무시 */ }
@@ -226,5 +245,5 @@ const Store = (() => {
     return 'demo';
   }
 
-  return { cloud, init, signup, login, logout, load, save, flush, demo, uid, onStatus, mode: () => session && session.mode };
+  return { cloud, init, signup, login, logout, changePassword, load, save, flush, demo, uid, onStatus, mode: () => session && session.mode };
 })();

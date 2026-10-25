@@ -582,14 +582,46 @@ const UI = (() => {
         <div class="field"><span>${ic('sound')}효과음</span><div class="seg"><button class="${s.sound ? 'on' : ''}" data-snd="1">켜기</button><button class="${!s.sound ? 'on' : ''}" data-snd="0">끄기</button></div></div>
         <div class="help"><b>조작법</b><br>클릭/탭: 그곳으로 이동 · 밭/건물 클릭: 바로 열기<br>WASD·방향키: 이동 · E/스페이스: 상호작용</div>
         <button class="btn gold wide" data-act="guide">${ic('book')}농장 운영 안내서 보기</button>
+        ${user === 'demo' ? '' : `<button class="btn ghost wide" data-act="pw">${ic('lock')}비밀번호 바꾸기</button>`}
         <p class="muted">${esc(user)} (${esc(state.nickname)}) · ${Store.mode() === 'cloud' ? `${ic('cloud')}클라우드에 저장 중 (어느 기기에서든 로그인 가능)` : '이 브라우저에만 저장 중'}</p>
         <button class="btn danger wide" data-act="logout">${ic('door')}로그아웃</button>`;
       $$('[data-tod]', m.body).forEach(b => { b.onclick = () => { s.tod = b.dataset.tod; World.setTimeMode(s.tod); persist(); Sfx.click(); render(); }; });
       $$('[data-snd]', m.body).forEach(b => { b.onclick = () => { s.sound = b.dataset.snd === '1'; Sfx.setEnabled(s.sound); persist(); Sfx.click(); render(); }; });
       $('[data-act=guide]', m.body).onclick = () => { Sfx.click(); Guide.open(); };
+      const pwBtn = $('[data-act=pw]', m.body);
+      if (pwBtn) pwBtn.onclick = () => { Sfx.click(); openPassword(); };
       $('[data-act=logout]', m.body).onclick = async () => { await Store.logout(); location.hash = ''; location.reload(); };
     }
     render();
+  }
+
+  function openPassword() {
+    const m = modal({
+      title: '비밀번호 바꾸기', icon: 'lock', cls: 'pw-modal',
+      body: `
+        <label class="field"><span>현재 비밀번호</span><input type="password" name="old" autocomplete="current-password"></label>
+        <label class="field"><span>새 비밀번호</span><input type="password" name="new" autocomplete="new-password" placeholder="6자 이상"></label>
+        <label class="field"><span>새 비밀번호 확인</span><input type="password" name="new2" autocomplete="new-password"></label>
+        <p class="muted">다른 사이트에서 쓰지 않는, 영문·숫자·기호를 섞은 8자 이상 비밀번호를 추천해요.</p>
+        <p class="err" hidden></p>
+        <button class="btn grape big wide" data-act="ok">${ic('lock')}바꾸기</button>`,
+    });
+    const v = n => $(`[name=${n}]`, m.body).value, err = $('.err', m.body);
+    const fail = msg => { err.textContent = msg; err.hidden = false; Sfx.error(); };
+    $('[data-act=ok]', m.body).onclick = async e => {
+      if (!v('old')) return fail('현재 비밀번호를 입력해 주세요.');
+      if (v('new').length < 6) return fail('새 비밀번호는 6자 이상이어야 해요.');
+      if (v('new') !== v('new2')) return fail('새 비밀번호 확인이 일치하지 않아요.');
+      if (v('new') === v('old')) return fail('지금과 다른 비밀번호를 입력해 주세요.');
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      const r = await Store.changePassword(v('old'), v('new'));
+      btn.disabled = false;
+      if (!r.ok) return fail(r.msg);
+      Sfx.coin();
+      m.close();
+      toast('{lock} 비밀번호를 바꿨어요!');
+    };
   }
 
   // ───── 월드에서 밭/건물을 눌렀을 때 ─────
