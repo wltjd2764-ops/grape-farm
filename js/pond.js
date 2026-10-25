@@ -1,7 +1,7 @@
 'use strict';
 // ───────── 이스터에그: 비밀의 연못 (물고기·해초 피해 헤엄치기) ─────────
 const Pond = (() => {
-  const W = 240, H = 160, R = Pix.R, { disc } = Pix;
+  const W = 240, H = 160, SX = 72, R = Pix.R, { disc } = Pix; // SX: 헤엄치는 캐릭터의 x 위치
   const cache = {};
   const memo = (k, fn) => cache[k] || (cache[k] = fn());
 
@@ -74,7 +74,7 @@ const Pond = (() => {
     const cv = m.body.querySelector('canvas'), c = cv.getContext('2d'), ov = m.body.querySelector('.mg-overlay');
     const $score = m.body.querySelector('.pd-score'), $hearts = m.body.querySelector('.pd-hearts');
     let st = 'ready', obs = [], items = [], bubbles = [], parts = [], floats = [];
-    let y = H / 2, ty = H / 2, hearts = 3, inv = 0, score = 0, bonus = 0, dist = 0, speed = 42, spawnT = 0, itemT = 1, gt = 0, last = 0, shake = 0;
+    let lvl = 0, y = H / 2, ty = H / 2, hearts = 3, inv = 0, score = 0, bonus = 0, dist = 0, speed = 42, spawnT = 0, itemT = 1, gt = 0, last = 0, shake = 0;
     const keys = {};
     const kd = e => { keys[e.key] = true; if (['ArrowUp', 'ArrowDown', ' '].includes(e.key)) e.preventDefault(); };
     const ku = e => { keys[e.key] = false; };
@@ -95,7 +95,7 @@ const Pond = (() => {
     function start() {
       Sfx.splash();
       obs = []; items = []; parts = []; floats = [];
-      y = ty = H / 2; hearts = 3; inv = 0; score = 0; bonus = 0; dist = 0; speed = 42; spawnT = 0.6; itemT = 1; gt = 0;
+      y = ty = H / 2; lvl = 0; hearts = 3; inv = 0; score = 0; bonus = 0; dist = 0; speed = 42; spawnT = 0.6; itemT = 1; gt = 0;
       ov.hidden = true; st = 'play';
     }
     function end() {
@@ -137,23 +137,25 @@ const Pond = (() => {
       if (keys.ArrowDown || keys.s || keys.S) ty += 110 * dt;
       ty = Math.max(12, Math.min(H - 20, ty));
       y += Math.max(-95 * dt, Math.min(95 * dt, ty - y));
-      speed = 42 + Math.min(60, gt * 1.2);
+      // 시간이 지날수록 점점 빨라짐 (약 50초 뒤 최고 속도), 10초마다 알림
+      speed = 45 + Math.min(135, gt * 2.6);
+      if (Math.floor(gt / 10) > lvl) { lvl = Math.floor(gt / 10); floats.push({ x: W / 2, y: 34, text: '속도 UP!', t: 0 }); Sfx.coin(); }
       dist += speed * dt;
       inv = Math.max(0, inv - dt);
       spawnT -= dt;
-      if (spawnT <= 0) { spawn(); spawnT = Math.max(0.55, 1.25 - gt * 0.012) + Math.random() * 0.35; }
+      if (spawnT <= 0) { spawn(); spawnT = Math.max(0.32, 1.2 - gt * 0.018) + Math.random() * 0.3; }
       itemT -= dt;
       if (itemT <= 0) { items.push({ k: Math.random() < 0.12 ? 'gold' : 'pearl', x: W + 6, y: 16 + Math.random() * (H - 46) }); itemT = 0.9 + Math.random() * 1.2; }
       score = Math.floor(dist / 10) + bonus;
-      const me = [24, y + 2, 15, 7];
+      const me = [SX + 2, y + 2, 15, 7];
       obs = obs.filter(o => {
         o.x -= (speed + (o.v || 0)) * dt;
         if (o.k === 'koi') o.y += Math.sin(gt * 2 + o.ph) * 10 * dt;
         if (o.k === 'puffer') o.y += Math.sin(gt * 1.3 + o.ph) * 14 * dt;
         if (inv <= 0 && hit(me, hitbox(o))) {
           hearts--; inv = 1.3; shake = 0.3; Sfx.bad();
-          floats.push({ x: 30, y, text: '앗!', t: 0 });
-          for (let k = 0; k < 10; k++) parts.push({ x: 32, y: y + 5, vx: (Math.random() - 0.5) * 60, vy: (Math.random() - 0.5) * 60, t: 0, life: 0.5, col: '#ffffff' });
+          floats.push({ x: SX + 8, y, text: '앗!', t: 0 });
+          for (let k = 0; k < 10; k++) parts.push({ x: SX + 10, y: y + 5, vx: (Math.random() - 0.5) * 60, vy: (Math.random() - 0.5) * 60, t: 0, life: 0.5, col: '#ffffff' });
           if (hearts <= 0) { end(); return false; }
         }
         return o.x > -30;
@@ -194,8 +196,8 @@ const Pond = (() => {
       });
       items.forEach(it => c.drawImage(it.k === 'gold' ? goldGrape() : pearl(), Math.round(it.x), Math.round(it.y + Math.sin(gt * 3 + it.x * 0.1) * 2)));
       if (st === 'play' || st === 'over') {
-        if (!(inv > 0 && Math.floor(gt * 12) % 2)) c.drawImage(swimmer(api.look(), Math.floor(gt * 6) % 4), 22, Math.round(y) - 1);
-        if (Math.floor(gt * 4) % 3 === 0) R(c, 41, Math.round(y) - 2 - Math.floor(gt * 20) % 6, 2, 2, 'rgba(220,250,255,.8)');
+        if (!(inv > 0 && Math.floor(gt * 12) % 2)) c.drawImage(swimmer(api.look(), Math.floor(gt * 6) % 4), SX, Math.round(y) - 1);
+        if (Math.floor(gt * 4) % 3 === 0) R(c, SX + 19, Math.round(y) - 2 - Math.floor(gt * 20) % 6, 2, 2, 'rgba(220,250,255,.8)');
       }
       parts.forEach(p => { c.globalAlpha = Math.max(0, 1 - p.t / p.life); R(c, Math.round(p.x), Math.round(p.y), 2, 2, p.col); });
       c.globalAlpha = 1;

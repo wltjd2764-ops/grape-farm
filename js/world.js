@@ -64,6 +64,86 @@ const World = (() => {
     return solids.some(([a, b, c, d]) => x + r > a && x - r < c && y + r > b && y - r < d);
   }
 
+  // ───── 길찾기 (A*, 0.25칸 격자) ─────
+  const CELL = 0.25, GN = N / CELL;
+  let walk = null;
+  const cellOf = v => Math.max(0, Math.min(GN - 1, Math.floor(v / CELL)));
+  const center = i => [((i % GN) + 0.5) * CELL, (Math.floor(i / GN) + 0.5) * CELL];
+  function buildWalk() {
+    walk = new Uint8Array(GN * GN);
+    for (let i = 0; i < GN * GN; i++) walk[i] = blocked(...center(i)) ? 0 : 1;
+  }
+  function nearestWalkable(i) {
+    if (walk[i]) return i;
+    const x0 = i % GN, y0 = Math.floor(i / GN);
+    for (let r = 1; r < 24; r++) {
+      let best = -1, bd = 1e9;
+      for (let y = y0 - r; y <= y0 + r; y++) for (let x = x0 - r; x <= x0 + r; x++) {
+        if (x < 0 || y < 0 || x >= GN || y >= GN || (Math.abs(x - x0) !== r && Math.abs(y - y0) !== r)) continue;
+        const d = (x - x0) ** 2 + (y - y0) ** 2;
+        if (walk[y * GN + x] && d < bd) { bd = d; best = y * GN + x; }
+      }
+      if (best >= 0) return best;
+    }
+    return -1;
+  }
+  function lineClear(a, b) {
+    const n = Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.08);
+    for (let k = 1; k <= n; k++) if (blocked(a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n)) return false;
+    return true;
+  }
+  const DIRS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.414], [1, -1, 1.414], [-1, 1, 1.414], [-1, -1, 1.414]];
+  // 시작점 → 목표점 경로 (격자 좌표 점 배열). 목표가 막혀 있으면 가장 가까운 갈 수 있는 곳까지
+  function findPath(from, to) {
+    if (!walk) buildWalk();
+    const s = nearestWalkable(cellOf(from[1]) * GN + cellOf(from[0]));
+    const goalCell = cellOf(to[1]) * GN + cellOf(to[0]);
+    const t = nearestWalkable(goalCell);
+    if (s < 0 || t < 0) return null;
+    const exactGoal = walk[goalCell] && !blocked(to[0], to[1]) ? to : center(t);
+    if (lineClear(from, exactGoal)) return [exactGoal];
+    const g = new Float32Array(GN * GN).fill(Infinity), came = new Int32Array(GN * GN).fill(-1), closed = new Uint8Array(GN * GN);
+    const tx = t % GN, ty = Math.floor(t / GN);
+    const hEst = i => Math.hypot((i % GN) - tx, Math.floor(i / GN) - ty);
+    const heap = [];
+    const push = (f, i) => { heap.push([f, i]); let k = heap.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
+    const pop = () => {
+      const top = heap[0], last = heap.pop();
+      if (heap.length) { heap[0] = last; let k = 0; for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } }
+      return top[1];
+    };
+    g[s] = 0; push(hEst(s), s);
+    while (heap.length) {
+      const cur = pop();
+      if (cur === t) break;
+      if (closed[cur]) continue;
+      closed[cur] = 1;
+      const cx = cur % GN, cy = Math.floor(cur / GN);
+      for (const [dx, dy, cost] of DIRS) {
+        const nx = cx + dx, ny = cy + dy;
+        if (nx < 0 || ny < 0 || nx >= GN || ny >= GN) continue;
+        const ni = ny * GN + nx;
+        if (!walk[ni] || closed[ni]) continue;
+        if (dx && dy && (!walk[cy * GN + nx] || !walk[ny * GN + cx])) continue;
+        const ng = g[cur] + cost;
+        if (ng < g[ni]) { g[ni] = ng; came[ni] = cur; push(ng + hEst(ni), ni); }
+      }
+    }
+    if (t !== s && came[t] < 0) return null;
+    const cells = [];
+    for (let i = t; i !== s && i >= 0; i = came[i]) cells.unshift(center(i));
+    cells[cells.length - 1] = exactGoal;
+    // 경로 다듬기: 직선으로 갈 수 있는 가장 먼 점으로 건너뛰기
+    const out = [];
+    let a = from, k = 0;
+    while (k < cells.length) {
+      let j = cells.length - 1;
+      while (j > k && !lineClear(a, cells[j])) j--;
+      out.push(cells[j]); a = cells[j]; k = j + 1;
+    }
+    return out;
+  }
+
   // ───── 상태 ─────
   let canvas, ctx, bg = null, bgUnlocked = -1, fg = null, state = null, hooks = {};
   let zoom = 3, dpr = 1, t = 0, last = 0, running = false, tod = 'auto';
@@ -165,16 +245,23 @@ const World = (() => {
 
   // ───── 입력 ─────
   const toWorld = (cx, cy) => [(cx * dpr + Math.round(cam.x * zoom - canvas.width / 2)) / zoom, (cy * dpr + Math.round(cam.y * zoom - canvas.height / 2)) / zoom];
+  // 클릭 판정 높이: 건물은 지붕까지, 심긴 밭은 덩굴 높이만큼(시렁 안쪽만), 빈 밭·잠긴 밭은 땅만
+  const hitHeight = it => it.kind !== 'plot' ? it.h : (it.i < state.plotsUnlocked && habitAt(it.i) ? 8 : 0);
   function hitTest(wx, wy) {
     for (const it of INTER) {
-      for (let z = 0; z <= it.h; z += 6) {
-        const [gx, gy] = toGrid(wx, wy + z);
-        if (gx >= it.x0 && gx < it.x1 && gy >= it.y0 && gy < it.y1) return it;
+      const h = hitHeight(it);
+      for (let z = 0; z <= h; z += 4) {
+        const [gx, gy] = toGrid(wx, wy + z), m = z && it.kind === 'plot' ? 0.2 : 0;
+        if (gx >= it.x0 + m && gx < it.x1 - m && gy >= it.y0 && gy < it.y1) return it;
       }
     }
     return null;
   }
-  function walkTo(g, cb) { player.target = g; player.onArrive = cb; player.stuck = 0; }
+  function walkTo(g, cb) {
+    const path = findPath([player.gx, player.gy], g) || [g];
+    player.path = path.slice(1);
+    player.target = path[0]; player.onArrive = cb; player.stuck = 0;
+  }
   function act(it) { if (it.kind === 'plot') hooks.onPlot(it.i); else hooks.onBuilding(it.id); }
   function onPointerDown(e) {
     if (UI.isBlocking()) return;
@@ -214,7 +301,7 @@ const World = (() => {
   }
 
   // ───── 업데이트 ─────
-  function arrive() { const cb = player.onArrive; player.target = null; player.onArrive = null; player.stuck = 0; if (cb) cb(); }
+  function arrive() { const cb = player.onArrive; player.target = null; player.path = []; player.onArrive = null; player.stuck = 0; if (cb) cb(); }
   function update(dt) {
     t += dt;
     const blocking = UI.isBlocking();
@@ -226,10 +313,13 @@ const World = (() => {
       if (keys.has('arrowdown') || keys.has('s')) sy++;
     }
     let mx = 0, my = 0;
-    if (sx || sy) { player.target = null; mx = sx / 2 + sy; my = sy - sx / 2; }
+    if (sx || sy) { player.target = null; player.path = []; mx = sx / 2 + sy; my = sy - sx / 2; }
     else if (player.target && !blocking) {
       const dx = player.target[0] - player.gx, dy = player.target[1] - player.gy, d = Math.hypot(dx, dy);
-      if (d < 0.08) arrive(); else { mx = dx; my = dy; }
+      if (d < 0.08) {
+        if (player.path && player.path.length) { player.target = player.path.shift(); player.stuck = 0; }
+        else arrive();
+      } else { mx = dx; my = dy; }
     }
     player.moving = !!(mx || my);
     if (player.moving) {
@@ -243,7 +333,7 @@ const World = (() => {
       player.ft += dt;
       if (player.target) {
         player.stuck = Math.hypot(player.gx - ox, player.gy - oy) < sp * 0.3 ? player.stuck + dt : 0;
-        if (player.stuck > 0.35) arrive();
+        if (player.stuck > 0.6) arrive();
       }
     } else player.ft = 0;
     player.frame = player.moving ? Math.floor(player.ft * 8) % 4 : 0;
